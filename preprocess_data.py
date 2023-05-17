@@ -109,7 +109,10 @@ def preprocess_data(vocab_filename, min_word_occurance):
     positive_lines = get_all_docs_in_dir('txt_sentoken/pos', vocab)
     save_list(positive_lines, 'positive.txt')
 
+def main():
+	min_word_occurance = 5
+	vocab_filename = "vocab.txt" 
+	preprocess_data(vocab_filename, min_word_occurance)
 
-min_word_occurance = 5
-vocab_filename = "vocab.txt" 
-preprocess_data(vocab_filename, min_word_occurance)
+if __name__ == "__main__":
+	main()
