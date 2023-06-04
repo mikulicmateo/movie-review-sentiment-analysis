@@ -1,0 +1,205 @@
+from sklearn.model_selection import StratifiedKFold
+import numpy as np
+from data_util import load_data_into_CountVector, load_encoded_data
+import tensorflow as tf
+import pandas as pd
+import matplotlib.pyplot as plt
+
+import warnings
+warnings.filterwarnings("ignore")
+
+rnn_dim = 32
+rnn_lr = 1e-4
+rnn_dropout = 0.5
+rnn_l2_lambda = 0
+rnn_patience = 3
+
+lstm_dim = 64
+lstm_lr = 3e-4
+lstm_dropout = 0.7
+lstm_l2_lambda = 0.1
+lstm_patience = 2
+
+gru_dim = 100
+gru_lr = 3e-4
+gru_dropout = 0.5
+gru_l2_lambda = 0.01
+gru_patience = 1
+
+
+train_splits = 3
+vocab_size = 14803
+max_epoch = 15
+random_state = 85
+
+
+def plot_learning_history(history, model_name, fold, dropout, dim, lr, l2):
+    txt = f"dropout: {dropout}, nn_dim: {dim}, Learning Rate: {lr}, l2_lambda: {l2}"
+
+    plt.plot(history.history['accuracy'])
+    try:
+        plt.plot(history.history['val_accuracy'])
+    except:
+        print("No val history")
+
+    plt.title(f'{model_name} accuracy')
+    plt.ylabel('accuracy')
+    plt.xlabel('epoch')
+    plt.legend(['train', 'val'], loc='upper left')
+    plt.figtext(0.5, 0.001, txt, wrap=True, horizontalalignment='center', fontsize=10)
+    plt.show()
+
+    plt.imsave(f"plots/{model_name}_fold{fold}.png")
+
+
+def remove_outliers(reviews_int, labels):
+
+    review_length = [len(line) for line in reviews_int]
+
+    # pd.Series(review_length).hist()
+    # plt.show()
+    # print(pd.Series(review_length).describe())
+
+    q1_bound = pd.Series(review_length).quantile(0.25)
+    q3_bound = pd.Series(review_length).quantile(0.75)
+    iqr = q3_bound - q1_bound
+
+    low_bound = q1_bound - 1.5 * iqr
+    high_bound = q3_bound + 1.5 * iqr
+
+    print(iqr)
+    print((low_bound, high_bound))
+
+    reviews_int = [reviews_int[i] for i, length in enumerate(review_length) if low_bound <= length <= high_bound]
+    labels = [labels[i] for i, length in enumerate(review_length) if low_bound <= length <= high_bound]
+
+    return np.array(reviews_int), np.array(labels)
+
+
+def pad_features(reviews_int):
+    #
+    # Return features of review_ints, where each review is padded with 0's or truncated to the input seq_length.
+    #
+
+    review_length = [len(line) for line in reviews_int]
+    seq_length = np.max(review_length)
+
+    features = np.zeros((len(reviews_int), seq_length), dtype=int)
+
+    for i, review in enumerate(reviews_int):
+        review_len = len(review)
+
+        if review_len <= seq_length:
+            zeroes = np.array(np.zeros(seq_length - review_len))
+            new = np.concatenate((zeroes, review))
+        elif review_len > seq_length:
+            new = review[0:seq_length]
+
+        features[i, :] = np.array(new)
+
+    return features
+
+
+def create_RNN(vocab_size, nn_dim, dropout, l2_lambda):
+    model = tf.keras.Sequential([
+        tf.keras.layers.Embedding(vocab_size + 1, nn_dim),
+        tf.keras.layers.SimpleRNN(nn_dim, dropout=dropout, kernel_initializer="he_normal", kernel_regularizer=tf.keras.regularizers.l2(l2_lambda)),
+        tf.keras.layers.Dense(1, activation='sigmoid')
+    ])
+    return model
+
+
+def create_LSTM(vocab_size, nn_dim, dropout, l2_lambda):
+    model = tf.keras.Sequential([
+        tf.keras.layers.Embedding(vocab_size + 1, nn_dim),
+        tf.keras.layers.LSTM(nn_dim, dropout=dropout, kernel_initializer="he_normal", kernel_regularizer=tf.keras.regularizers.l2(l2_lambda)),
+        tf.keras.layers.Dense(1, activation='sigmoid')
+    ])
+    return model
+
+
+def create_GRU(vocab_size, nn_dim, dropout, l2_lambda):
+    model = tf.keras.Sequential([
+        tf.keras.layers.Embedding(vocab_size + 1, nn_dim, mask_zero=True),
+        tf.keras.layers.GRU(nn_dim, dropout=dropout, kernel_initializer="he_normal",
+                            kernel_regularizer=tf.keras.regularizers.l2(l2_lambda)),
+        tf.keras.layers.Dense(1, activation='sigmoid')
+    ])
+
+    return model
+
+
+def create_model(model_name, vocab_size, nn_dim, lr, dropout, l2_lambda):
+    if model_name == "rnn":
+        model = create_RNN(vocab_size, nn_dim, dropout, l2_lambda)
+    elif model_name == "lstm":
+        model = create_LSTM(vocab_size, nn_dim, dropout, l2_lambda)
+    elif model_name == "gru":
+        model = create_GRU(vocab_size, nn_dim, dropout, l2_lambda)
+    else:
+        print("ERROR: Please specify valid model")
+        return None
+
+    optimizer = tf.optimizers.AdamW(learning_rate=lr)
+    model.compile(loss="binary_crossentropy", optimizer=optimizer, metrics=['accuracy'])
+
+    return model
+
+
+def kfold_train(encoded_reviews, labels, random_state):
+
+    accuracies_rnn = []
+    accuracies_lstm = []
+    accuracies_gru = []
+
+    fold = 1
+    for train_index, test_index in StratifiedKFold(n_splits=train_splits, shuffle=True, random_state=random_state).split(
+            encoded_reviews, labels):
+        x_train, x_test = encoded_reviews[train_index], encoded_reviews[test_index]
+        y_train, y_test = labels[train_index], labels[test_index]
+
+        print(f"---------- TRAINING RNN FOLD {fold}/{train_splits} ----------")
+        early_stop_rnn = tf.keras.callbacks.EarlyStopping(monitor='val_accuracy', patience=rnn_patience, start_from_epoch=1)
+        model_rnn = create_model("rnn", vocab_size, rnn_dim, rnn_lr, rnn_dropout, rnn_l2_lambda)
+        train_history_rnn = model_rnn.fit(x_train, y_train, validation_data=(x_test, y_test), epochs=max_epoch,
+                                          callbacks=[early_stop_rnn])
+        val_rnn = model_rnn.evaluate(x_test, y_test)
+        accuracies_rnn.append(val_rnn[1])
+        plot_learning_history(train_history_rnn, "rnn", fold, rnn_dropout, rnn_dim, rnn_lr, rnn_l2_lambda)
+
+        print("---------- TRAINING LSTM FOLD {fold}/{train_splits} ----------")
+        model_lstm = create_model("lstm", vocab_size, lstm_dim, lstm_lr, lstm_dropout, lstm_l2_lambda)
+        early_stop_lstm = tf.keras.callbacks.EarlyStopping(monitor='val_accuracy', patience=lstm_patience, start_from_epoch=1)
+        train_history_lstm = model_lstm.fit(x_train, y_train, validation_data=(x_test, y_test), epochs=max_epoch, callbacks=[early_stop_lstm])
+        val_lstm = model_lstm.evaluate(x_test, y_test)
+        accuracies_lstm.append(val_lstm[1])
+        plot_learning_history(train_history_lstm, "lstm", fold, lstm_dropout, lstm_dim, lstm_lr, lstm_l2_lambda)
+
+        print("---------- TRAINING GRU FOLD {fold}/{train_splits}----------")
+        model_gru = create_model("gru", vocab_size, gru_dim, gru_lr, gru_dropout, gru_l2_lambda)
+        early_stop_gru = tf.keras.callbacks.EarlyStopping(monitor='val_accuracy', patience=gru_patience, start_from_epoch=1)
+        train_history_gru = model_gru.fit(x_train, y_train, validation_data=(x_test, y_test), epochs=max_epoch, callbacks=[early_stop_gru])
+        val_gru = model_gru.evaluate(x_test, y_test)
+        accuracies_gru.append(val_gru[1])
+        plot_learning_history(train_history_gru, "gru", fold, gru_dropout, gru_dim, gru_lr, gru_l2_lambda)
+
+        fold += 1
+
+    print("Average accuracy RNN: ", np.average(accuracies_rnn))
+    print("Average accuracy LSTM: ", np.average(accuracies_lstm))
+    print("Average accuracy GRU: ", np.average(accuracies_gru))
+
+def main():
+    _, labels = load_data_into_CountVector()
+
+    #without removing outliers
+    encoded_reviews = pad_features(load_encoded_data())
+    kfold_train(encoded_reviews, labels, random_state)
+
+    #removed outliers
+    encoded_reviews, labels = remove_outliers(load_encoded_data(), labels)
+    encoded_reviews = pad_features(encoded_reviews)
+    kfold_train(encoded_reviews, labels, random_state)
+
+if __name__ == "__main__":
+    main()

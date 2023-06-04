@@ -1,6 +1,9 @@
 from sklearn.feature_extraction.text import CountVectorizer
 import numpy as np
+import pandas as pd
 
+import sys
+np.set_printoptions(threshold=sys.maxsize)
 def load_data_into_CountVector():
     with open("positive.txt", "r") as file:
         positive_lines = file.readlines()
@@ -8,9 +11,17 @@ def load_data_into_CountVector():
         negative_lines = file.readlines()    
 
     lines = np.append(positive_lines, negative_lines)
-    count_vec = CountVectorizer(stop_words='english', binary=True)
+    count_vec = CountVectorizer(binary=True)
     count_matrix = count_vec.fit_transform(lines)
     tokens = count_matrix.toarray()
+
+    # dictionary = []
+    # with open("vocab.txt", "r") as file:
+    #     for line in file.readlines():
+    #         dictionary.append(line.strip())
+    #
+    # df = pd.DataFrame(tokens[:5], columns=dictionary)
+    # df.to_csv("tokens.csv")
 
     positive_labels = np.ones(len(positive_lines))
     negative_labels = np.zeros(len(negative_lines))
