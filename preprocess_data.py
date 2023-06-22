@@ -1,5 +1,5 @@
 from string import punctuation
-from os import listdir
+import os
 from collections import Counter
 from nltk.corpus import stopwords
 
@@ -8,6 +8,16 @@ from nltk.corpus import stopwords
 def load_doc(filename):
     # open the file as read only
     file = open(filename, 'r')
+    # read all text
+    text = file.read()
+    # close the file
+    file.close()
+    return text
+
+
+def load_vocab(filename):
+    # open the file as read only
+    file = open(os.path.join("Preprocessed_Data/Updated_Dataset", filename), 'r')
     # read all text
     text = file.read()
     # close the file
@@ -45,7 +55,7 @@ def add_doc_to_vocab(filename, vocab):
 # load all docs in a directory
 def add_docs_to_vocab(directory, vocab):
     # walk through all files in the folder
-    for filename in listdir(directory):
+    for filename in os.listdir(directory):
         # skip files that do not have the right extension
         if not filename.endswith(".txt"):
             continue
@@ -63,17 +73,17 @@ def save_list(lines, filename):
     file.close()
 
 
-def create_vocab_file(min_word_occurance, vocab_filename):
+def create_vocab_file(min_word_occurrence, vocab_filename):
     # define vocab
     vocab = Counter()
     # add all docs to vocab
-    add_docs_to_vocab('txt_sentoken/neg', vocab)
-    add_docs_to_vocab('txt_sentoken/pos', vocab)
+    add_docs_to_vocab('Datasets/Updated_Dataset/neg', vocab)
+    add_docs_to_vocab('Datasets/Updated_Dataset/pos', vocab)
     # keep tokens with > 5 occurrence
-    tokens = [k for k, c in vocab.items() if c >= min_word_occurance]
+    tokens = [k for k, c in vocab.items() if c >= min_word_occurrence]
     print(f"Words in vocab: {len(tokens)}")
     # save tokens to a vocabulary file
-    save_list(tokens, vocab_filename)
+    save_list(tokens, os.path.join("Preprocessed_Data/Updated_Dataset", vocab_filename))
 
 
 # load doc, clean and return line of tokens
@@ -90,7 +100,7 @@ def doc_to_line(filename, vocab):
 def get_all_docs_in_dir(directory, vocab):
     lines = list()
     # walk through all files in the folder
-    for filename in listdir(directory):
+    for filename in os.listdir(directory):
         # skip files that do not have the right extension
         if not filename.endswith(".txt"):
             continue
@@ -103,23 +113,23 @@ def get_all_docs_in_dir(directory, vocab):
     return lines
 
 
-def preprocess_data(vocab_filename, min_word_occurance):
-    create_vocab_file(min_word_occurance, vocab_filename)
-    vocab = load_doc(vocab_filename)
+def preprocess_data(vocab_filename, min_word_occurrence):
+    create_vocab_file(min_word_occurrence, vocab_filename)
+    vocab = load_vocab(vocab_filename)
     vocab = vocab.split()
     vocab = set(vocab)
     # prepare negative reviews
-    negative_lines = get_all_docs_in_dir('txt_sentoken/neg', vocab)
-    save_list(negative_lines, 'negative.txt')
+    negative_lines = get_all_docs_in_dir('Datasets/Updated_Dataset/neg', vocab)
+    save_list(negative_lines, os.path.join("Preprocessed_Data/Updated_Dataset", "negative.txt"))
     # prepare positive reviews
-    positive_lines = get_all_docs_in_dir('txt_sentoken/pos', vocab)
-    save_list(positive_lines, 'positive.txt')
+    positive_lines = get_all_docs_in_dir('Datasets/Updated_Dataset/pos', vocab)
+    save_list(positive_lines, os.path.join("Preprocessed_Data/Updated_Dataset", "positive.txt"))
 
 
 def main():
-    min_word_occurance = 5
+    min_word_occurrence = 5
     vocab_filename = "vocab.txt"
-    preprocess_data(vocab_filename, min_word_occurance)
+    preprocess_data(vocab_filename, min_word_occurrence)
 
 
 if __name__ == "__main__":

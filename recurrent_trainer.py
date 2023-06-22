@@ -7,7 +7,7 @@ import pandas as pd
 import tensorflow as tf
 from sklearn.model_selection import StratifiedKFold
 
-from data_util import load_data_into_CountVector, load_encoded_data
+from data_util import load_data_into_count_vector, load_encoded_data
 
 warnings.filterwarnings("ignore")
 
@@ -192,7 +192,7 @@ def kfold_train(encoded_reviews, labels, random_state, removed_outliers):
 
 
 def main():
-    _, labels = load_data_into_CountVector()
+    _, labels = load_data_into_count_vector()
 
     ## without removing outliers
     removed_outliers = False
