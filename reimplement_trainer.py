@@ -16,7 +16,7 @@ def main():
     random_state = 85
     svm_model = svm.SVC(kernel='linear', random_state=random_state)
     nb_model = naive_bayes.BernoulliNB()
-    me_model = LogisticRegression(random_state=random_state)
+    me_model = LogisticRegression(random_state=random_state, max_iter=1000)
 
     print("Making K-fold")
     kfold = StratifiedKFold(n_splits=3, shuffle=True, random_state=random_state)

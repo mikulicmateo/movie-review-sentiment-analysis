@@ -13,10 +13,10 @@ class BERTModel(nn.Module):
 
     # Forward propagaion class
     def forward(self, input_ids, attention_mask):
-        _, pooled_output = self.bert(
+        obj = self.bert(
             input_ids=input_ids,
             attention_mask=attention_mask
         )
         #  Add a dropout layer
-        output = self.drop(pooled_output)
+        output = self.drop(obj.pooler_output)
         return self.out(output)

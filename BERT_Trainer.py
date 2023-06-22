@@ -1,3 +1,4 @@
+import datetime
 import numpy as np
 from data_util import load_raw_text_data
 from transformers import BertTokenizer, AdamW
@@ -9,6 +10,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from collections import defaultdict
 import matplotlib.pyplot as plt
+import os
 
 
 
@@ -18,6 +20,25 @@ def create_data_loader(bert_dataset, batch_size, num_workers):
         batch_size=batch_size,
         num_workers=num_workers
     )
+
+def create_model_state_dict(epoch, train_loss, val_loss, model, optimizer):
+    model_state = {
+        'time': str(datetime.datetime.now()),
+        'model_state': model.state_dict(),
+        'model_name': type(model).__name__,
+        'optimizer_state': optimizer.state_dict(),
+        'optimizer_name': type(optimizer).__name__,
+        'epoch': epoch,
+        'train_loss': train_loss,
+        'val_loss': val_loss
+    }
+    return model_state
+
+def save_model(train_loss, val_loss, epoch, best, model, optimizer):
+    model_state = create_model_state_dict(epoch, train_loss, val_loss, model, optimizer)
+    torch.save(model_state, "last-BERT.pt")
+    if best:
+        torch.save(model_state, "best-BERT.pt")
 
 
 def train_epoch(model, training_dataloader, device, loss_fn, optimizer, n_examples):
@@ -95,18 +116,18 @@ def train(model, optimizer, training_dataloader, validation_dataloader, device, 
 
         print(f"Epoch {epoch}:")
         train_acc, train_loss = train_epoch(model, training_dataloader, device, loss_fn, optimizer, train_n_examples)
-        print(f"Training Loss: {train_loss}, Training accuraccy: {train_acc}")
+        print(f"Training Loss: {train_loss}, Training accuracy: {train_acc}")
 
         #if epoch % val_step == 0:
         val_acc, val_loss = evaluate_epoch(model, validation_dataloader, device, loss_fn, val_n_examples)
-        print(f"Validation Loss: {val_loss}")
+        print(f"Validation Loss: {val_loss}, Val accuracy: {val_acc}")
 
 
-        # #save_model(train_loss, val_loss, epoch, best=False)
-        # if val_loss < best_val_loss:
-        #     #save_model(train_loss, val_loss, epoch, best=True)
-        #     best_val_loss = val_loss
-        #     best_epoch = epoch
+        save_model(train_loss, val_loss, epoch, False, model, optimizer)
+        if val_loss < best_val_loss:
+            save_model(train_loss, val_loss, epoch, True, model, optimizer)
+            best_val_loss = val_loss
+            best_epoch = epoch
 
         #save_model(train_loss, val_loss, epoch, best=False)
         if val_acc > best_val_acc:
@@ -154,14 +175,24 @@ def main():
 
     model_name = 'bert-base-cased'
     tokenizer = BertTokenizer.from_pretrained(model_name)
-    max_length = np.max([len(line) for line in reviews])
+
+    token_lens = []
+
+    # Iterate through the content slide
+    for txt in reviews:
+        tokens = tokenizer.encode(txt, max_length=512, truncation=True)
+        token_lens.append(len(tokens))
+
+    max_length = np.max(token_lens)
 
     full_dataset = BERTDataset(reviews, labels, tokenizer, max_length)
     training_data, validation_data, test_data = torch.utils.data.random_split(full_dataset, [40_000, 9_000, 1_000])
+    batch_size = 2
+    num_workers = 6
 
-    training_loader = create_data_loader(training_data, batch_size=32, num_workers=6)
-    validation_loader = create_data_loader(validation_data, batch_size=32, num_workers=6)
-    test_loader = create_data_loader(test_data, batch_size=32, num_workers=6)
+    training_loader = create_data_loader(training_data, batch_size=batch_size, num_workers=num_workers)
+    validation_loader = create_data_loader(validation_data, batch_size=batch_size, num_workers=num_workers)
+    test_loader = create_data_loader(test_data, batch_size=batch_size, num_workers=num_workers)
 
     model = BERTModel()
     model = model.to(device)
@@ -170,7 +201,7 @@ def main():
 
     optimizer = AdamW(model.parameters(), lr=1e-5, weight_decay=1e-05, correct_bias=False)
     loss_fn = nn.CrossEntropyLoss().to(device)
-    train(model, optimizer, training_loader, validation_loader, device, loss_fn, len(training_data), len(validation_data),EPOCHS)
+    train(model, optimizer, training_loader, validation_loader, device, loss_fn, len(training_data), len(validation_data), EPOCHS)
 
     test_acc, test_loss = evaluate_epoch(
         model,
