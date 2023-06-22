@@ -46,3 +46,7 @@ def encode_data():
 def load_encoded_data():
     encoded_data = np.load("Preprocessed_Data/Updated_Dataset/encoded_reviews.npy", allow_pickle=True)
     return encoded_data
+
+
+if __name__ == "__main__":
+    encode_data()

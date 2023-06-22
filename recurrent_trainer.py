@@ -14,7 +14,7 @@ warnings.filterwarnings("ignore")
 rnn_dim = 32
 rnn_lr = 3e-4
 rnn_dropout = 0.7
-rnn_l2_lambda = 0.1
+rnn_l2_lambda = 0.01
 rnn_patience = 3
 
 lstm_dim = 64
@@ -30,7 +30,7 @@ gru_l2_lambda = 0.01
 gru_patience = 1
 
 train_splits = 3
-vocab_size = 14803
+vocab_size = 50183#14803
 max_epoch = 15
 random_state = 85
 
@@ -55,6 +55,15 @@ def plot_learning_history(history, model_name, fold, dropout, dim, lr, l2, remov
 
 def remove_outliers(reviews_int, labels):
     review_length = [len(line) for line in reviews_int]
+
+    pd.Series(review_length).hist()
+    plt.title(f'Distribucija duljine recenzija')
+    plt.ylabel('Količina recenzija')
+    plt.xlabel('Broj riječi')
+    plt.grid(None)
+    plt.show()
+
+    print(pd.Series(review_length).describe())
 
     q1_bound = pd.Series(review_length).quantile(0.25)
     q3_bound = pd.Series(review_length).quantile(0.75)
@@ -95,7 +104,7 @@ def pad_features(reviews_int):
 
 def create_RNN(vocab_size, nn_dim, dropout, l2_lambda):
     model = tf.keras.Sequential([
-        tf.keras.layers.Embedding(vocab_size + 1, nn_dim),
+        tf.keras.layers.Embedding(vocab_size + 1, nn_dim, mask_zero=True),
         tf.keras.layers.SimpleRNN(nn_dim, dropout=dropout, kernel_initializer="he_normal",
                                   kernel_regularizer=tf.keras.regularizers.l2(l2_lambda)),
         tf.keras.layers.Dense(1, activation='sigmoid')
@@ -105,7 +114,7 @@ def create_RNN(vocab_size, nn_dim, dropout, l2_lambda):
 
 def create_LSTM(vocab_size, nn_dim, dropout, l2_lambda):
     model = tf.keras.Sequential([
-        tf.keras.layers.Embedding(vocab_size + 1, nn_dim),
+        tf.keras.layers.Embedding(vocab_size + 1, nn_dim, mask_zero=True),
         tf.keras.layers.LSTM(nn_dim, dropout=dropout, kernel_initializer="he_normal",
                              kernel_regularizer=tf.keras.regularizers.l2(l2_lambda)),
         tf.keras.layers.Dense(1, activation='sigmoid')
@@ -194,7 +203,7 @@ def kfold_train(encoded_reviews, labels, random_state, removed_outliers):
 def main():
     _, labels = load_data_into_count_vector()
 
-    ## without removing outliers
+    # without removing outliers
     removed_outliers = False
     encoded_reviews = pad_features(load_encoded_data())
     kfold_train(encoded_reviews, labels, random_state, removed_outliers)
