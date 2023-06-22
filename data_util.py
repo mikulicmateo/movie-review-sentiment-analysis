@@ -22,6 +22,22 @@ def load_data_into_count_vector():
     return tokens, labels
 
 
+def load_raw_text_data():
+    with open("Preprocessed_Data/Updated_Dataset/positive.txt", "r") as file:
+        positive_lines = file.readlines()
+    with open("Preprocessed_Data/Updated_Dataset/negative.txt", "r") as file:
+        negative_lines = file.readlines()
+
+    lines = np.append(positive_lines, negative_lines)
+
+    positive_labels = np.ones(len(positive_lines))
+    negative_labels = np.zeros(len(negative_lines))
+
+    labels = np.append(positive_labels, negative_labels)
+
+    return lines, labels
+
+
 def encode_data():
     with open("Preprocessed_Data/Updated_Dataset/positive.txt", "r") as file:
         positive_lines = file.readlines()

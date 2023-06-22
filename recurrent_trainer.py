@@ -30,7 +30,7 @@ gru_l2_lambda = 0.01
 gru_patience = 1
 
 train_splits = 3
-vocab_size = 50183#14803
+vocab_size = 50183  # Old Vocab size: 14803
 max_epoch = 15
 random_state = 85
 
