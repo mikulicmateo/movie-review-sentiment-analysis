@@ -1,7 +1,7 @@
 import datetime
 import numpy as np
 from data_util import load_raw_text_data
-from transformers import BertTokenizer, AdamW
+from transformers import DistilBertTokenizer, AdamW
 from torch import nn
 from BERT_Dataset_Class import BERTDataset
 from BERT_Model_Class import BERTModel
@@ -140,10 +140,8 @@ def train(model, optimizer, training_dataloader, validation_dataloader, device, 
             early_stop = True
             break
 
-        history['train_acc'].append(train_acc)
-        history['train_loss'].append(train_loss)
-        history['val_acc'].append(val_acc)
-        history['val_loss'].append(val_loss)
+        history['train_acc'].append(train_acc.cpu().detach().numpy())
+        history['val_acc'].append(val_acc.cpu().detach().numpy())
 
         print("---------------------------")
 
@@ -160,6 +158,7 @@ def train(model, optimizer, training_dataloader, validation_dataloader, device, 
     plt.xlabel('Epoch')
     plt.legend()
     plt.ylim([0, 1])
+    plt.show()
 
     print("Finished training")
 
@@ -173,8 +172,8 @@ def main():
 
     reviews, labels = load_raw_text_data()
 
-    model_name = 'bert-base-cased'
-    tokenizer = BertTokenizer.from_pretrained(model_name)
+    model_name = 'distilbert-base-uncased'
+    tokenizer = DistilBertTokenizer.from_pretrained(model_name)
 
     token_lens = []
 
@@ -187,7 +186,7 @@ def main():
 
     full_dataset = BERTDataset(reviews, labels, tokenizer, max_length)
     training_data, validation_data, test_data = torch.utils.data.random_split(full_dataset, [40_000, 9_000, 1_000])
-    batch_size = 2
+    batch_size = 16
     num_workers = 6
 
     training_loader = create_data_loader(training_data, batch_size=batch_size, num_workers=num_workers)
@@ -197,9 +196,9 @@ def main():
     model = BERTModel()
     model = model.to(device)
 
-    EPOCHS = 10
+    EPOCHS = 7
 
-    optimizer = AdamW(model.parameters(), lr=1e-5, weight_decay=1e-05, correct_bias=False)
+    optimizer = AdamW(model.parameters(), lr=2e-5, weight_decay=0.01)
     loss_fn = nn.CrossEntropyLoss().to(device)
     train(model, optimizer, training_loader, validation_loader, device, loss_fn, len(training_data), len(validation_data), EPOCHS)
 
@@ -210,7 +209,7 @@ def main():
         loss_fn,
         len(test_data)
     )
-    print(f"Training accuraccy: {test_acc}, Test loss {test_loss}")
+    print(f"Test accuracy: {test_acc}, Test loss {test_loss}")
 
 
 if __name__ == "__main__":
