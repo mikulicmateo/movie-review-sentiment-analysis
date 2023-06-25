@@ -1,10 +1,9 @@
+from data_util import load_raw_text_data_for_transformers
+from transformers import BertTokenizer, AdamW
+from Transformers.Transformer_Dataset import TransformerDataset
+from BERT_Model import BERTModel
 import torch.utils.data
-from transformers import DistilBertTokenizer, AdamW
-
-from BERT_Dataset_Class import BERTDataset
-from Distil_BERT_Model_Class import DistilBERTModel
-from data_util import load_raw_text_data
-from trainer_util import *
+from transformer_trainer_util import *
 
 
 def main():
@@ -15,10 +14,10 @@ def main():
 
     print(device)
 
-    reviews, labels = load_raw_text_data()
+    reviews, labels = load_raw_text_data_for_transformers()
 
-    model_name = 'distilbert-base-uncased'
-    tokenizer = DistilBertTokenizer.from_pretrained(model_name)
+    model_name = 'bert-base-uncased'
+    tokenizer = BertTokenizer.from_pretrained(model_name)
 
     token_lens = []
 
@@ -29,24 +28,26 @@ def main():
 
     max_length = np.max(token_lens)
 
-    full_dataset = BERTDataset(reviews, labels, tokenizer, max_length)
+    full_dataset = TransformerDataset(reviews, labels, tokenizer, max_length)
     training_data, validation_data, test_data = torch.utils.data.random_split(full_dataset, [40_000, 9_000, 1_000])
-    batch_size = 16
-    num_workers = 6
+    batch_size = 8
+    num_workers = 3
 
     training_loader = create_data_loader(training_data, batch_size=batch_size, num_workers=num_workers)
     validation_loader = create_data_loader(validation_data, batch_size=batch_size, num_workers=num_workers)
     test_loader = create_data_loader(test_data, batch_size=batch_size, num_workers=num_workers)
 
-    model = DistilBERTModel()
+    model = BERTModel()
     model = model.to(device)
 
-    EPOCHS = 7
+    EPOCHS = 20
 
     optimizer = AdamW(model.parameters(), lr=2e-5, weight_decay=0.01)
     loss_fn = nn.CrossEntropyLoss().to(device)
-    train(model, optimizer, training_loader, validation_loader, device, loss_fn, len(training_data),
-          len(validation_data), EPOCHS)
+    train(model, optimizer, training_loader, validation_loader, device, loss_fn, len(training_data), len(validation_data), EPOCHS)
+
+    model = BERTModel()
+    model, _ = load_model('../Models/best-BERT.pt', model, None)
 
     test_acc, test_loss = evaluate_epoch(
         model,
@@ -60,3 +61,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+

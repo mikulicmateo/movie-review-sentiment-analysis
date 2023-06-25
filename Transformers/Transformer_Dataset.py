@@ -2,24 +2,20 @@ import torch
 from torch.utils.data import Dataset
 
 
-class BERTDataset(Dataset):
-    # Constructor Function
+class TransformerDataset(Dataset):
     def __init__(self, reviews, targets, tokenizer, max_len):
         self.reviews = reviews
         self.targets = targets
         self.tokenizer = tokenizer
         self.max_len = max_len
 
-    # Length magic method
     def __len__(self):
         return len(self.reviews)
 
-    # get item magic method
     def __getitem__(self, item):
         review = str(self.reviews[item])
         target = self.targets[item]
 
-        # Encoded format to be returned
         encoding = self.tokenizer.encode_plus(
             review,
             add_special_tokens=True,

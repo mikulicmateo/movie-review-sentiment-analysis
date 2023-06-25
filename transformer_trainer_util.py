@@ -17,6 +17,23 @@ def create_data_loader(bert_dataset, batch_size, num_workers):
     )
 
 
+def load_model(model_path, model, optimizer):
+    model_dict = torch.load(model_path)
+    if torch.cuda.is_available():
+        device = "cuda"
+    else:
+        print("cuda not available!")
+        return None, None, None
+
+    model.load_state_dict(model_dict['model_state'])
+    model.to(device)
+
+    if optimizer is not None:
+        optimizer.load_state_dict(model_dict['optimizer_state'])
+
+    return model, optimizer
+
+
 def create_model_state_dict(epoch, train_loss, val_loss, model, optimizer):
     model_state = {
         'time': str(datetime.datetime.now()),
@@ -33,9 +50,9 @@ def create_model_state_dict(epoch, train_loss, val_loss, model, optimizer):
 
 def save_model(train_loss, val_loss, epoch, best, model, optimizer):
     model_state = create_model_state_dict(epoch, train_loss, val_loss, model, optimizer)
-    torch.save(model_state, "last-BERT.pt")
+    torch.save(model_state, "Transformers/Models/last-BERT.pt")
     if best:
-        torch.save(model_state, "best-BERT.pt")
+        torch.save(model_state, "Transformers/Models/best-BERT.pt")
 
 
 def train_epoch(model, training_dataloader, device, loss_fn, optimizer, n_examples):

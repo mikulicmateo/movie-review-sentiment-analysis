@@ -22,10 +22,10 @@ def load_data_into_count_vector():
     return tokens, labels
 
 
-def load_raw_text_data():
-    with open("Preprocessed_Data/Updated_Dataset/positive.txt", "r") as file:
+def load_raw_text_data_for_transformers():
+    with open("../../Preprocessed_Data/Updated_Dataset/positive.txt", "r") as file:
         positive_lines = file.readlines()
-    with open("Preprocessed_Data/Updated_Dataset/negative.txt", "r") as file:
+    with open("../../Preprocessed_Data/Updated_Dataset/negative.txt", "r") as file:
         negative_lines = file.readlines()
 
     lines = np.append(positive_lines, negative_lines)
