@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold, train_test_split
 
 from data_util import load_data_into_count_vector, load_encoded_data
 
@@ -164,7 +164,7 @@ def kfold_train(encoded_reviews, labels, random_state, removed_outliers):
 
         print(f"---------- TRAINING RNN FOLD {fold}/{train_splits} ----------")
         early_stop_rnn = tf.keras.callbacks.EarlyStopping(monitor='val_accuracy', patience=rnn_patience,
-                                                          start_from_epoch=8)
+                                                          start_from_epoch=3)
         model_rnn = create_model("rnn", vocab_size, rnn_dim, rnn_lr, rnn_dropout, rnn_l2_lambda)
         train_history_rnn = model_rnn.fit(x_train, y_train, validation_data=(x_test, y_test), epochs=max_epoch,
                                           callbacks=[early_stop_rnn])
@@ -176,7 +176,7 @@ def kfold_train(encoded_reviews, labels, random_state, removed_outliers):
         print(f"---------- TRAINING LSTM FOLD {fold}/{train_splits} ----------")
         model_lstm = create_model("lstm", vocab_size, lstm_dim, lstm_lr, lstm_dropout, lstm_l2_lambda)
         early_stop_lstm = tf.keras.callbacks.EarlyStopping(monitor='val_accuracy', patience=lstm_patience,
-                                                           start_from_epoch=8)
+                                                           start_from_epoch=3)
         train_history_lstm = model_lstm.fit(x_train, y_train, validation_data=(x_test, y_test), epochs=max_epoch,
                                             callbacks=[early_stop_lstm])
         accuracies_lstm.append(np.max(train_history_lstm.history['val_accuracy']))
@@ -186,7 +186,7 @@ def kfold_train(encoded_reviews, labels, random_state, removed_outliers):
         print(f"---------- TRAINING GRU FOLD {fold}/{train_splits}----------")
         model_gru = create_model("gru", vocab_size, gru_dim, gru_lr, gru_dropout, gru_l2_lambda)
         early_stop_gru = tf.keras.callbacks.EarlyStopping(monitor='val_accuracy', patience=gru_patience,
-                                                          start_from_epoch=8)
+                                                          start_from_epoch=3)
         train_history_gru = model_gru.fit(x_train, y_train, validation_data=(x_test, y_test), epochs=max_epoch,
                                           callbacks=[early_stop_gru])
         accuracies_gru.append(np.max(train_history_gru.history['val_accuracy']))
@@ -199,20 +199,71 @@ def kfold_train(encoded_reviews, labels, random_state, removed_outliers):
     print("Average accuracy LSTM: ", np.average(accuracies_lstm))
     print("Average accuracy GRU: ", np.average(accuracies_gru))
 
+def train_validation_test(encoded_reviews, labels, random_state, removed_outliers):
+
+    x_train, x_test, y_train, y_test = train_test_split(encoded_reviews, labels, random_state=random_state, test_size=0.02)
+
+    early_stop_rnn = tf.keras.callbacks.EarlyStopping(monitor='val_accuracy', patience=rnn_patience,
+                                                      start_from_epoch=3)
+    model_rnn = create_model("rnn", vocab_size, rnn_dim, rnn_lr, rnn_dropout, rnn_l2_lambda)
+    rnn_save = tf.keras.callbacks.ModelCheckpoint('.mdl_wtsRNN.hdf5', save_best_only=True, monitor='val_accuracy', mode='max')
+    train_history_rnn = model_rnn.fit(x_train, y_train, validation_split=0.1836, epochs=max_epoch, callbacks=[early_stop_rnn, rnn_save])
+
+    rnn_validation_accuracy = np.max(train_history_rnn.history['val_accuracy'])
+    plot_learning_history(train_history_rnn, "rnn", 0, rnn_dropout, rnn_dim, rnn_lr, rnn_l2_lambda, removed_outliers)
+    model_rnn.load_weights(filepath = '.mdl_wtsRNN.hdf5')
+    scoreRNN = model_rnn.evaluate(x_test, y_test)
+
+    print(f"---------- TRAINING LSTM ----------")
+    model_lstm = create_model("lstm", vocab_size, lstm_dim, lstm_lr, lstm_dropout, lstm_l2_lambda)
+    lstm_save = tf.keras.callbacks.ModelCheckpoint('.mdl_wtsLSTM.hdf5', save_best_only=True, monitor='val_accuracy', mode='max')
+    early_stop_lstm = tf.keras.callbacks.EarlyStopping(monitor='val_accuracy', patience=lstm_patience, start_from_epoch=3)
+    train_history_lstm = model_lstm.fit(x_train, y_train, validation_data=(x_test, y_test), epochs=max_epoch,
+                                        callbacks=[early_stop_lstm, lstm_save])
+    lstm_validation_accuracy = np.max(train_history_lstm.history['val_accuracy'])
+    plot_learning_history(train_history_lstm, "lstm", 0, lstm_dropout, lstm_dim, lstm_lr, lstm_l2_lambda, removed_outliers)
+    model_lstm.load_weights(filepath = '.mdl_wtsLSTM.hdf5')
+    scoreLSTM = model_lstm.evaluate(x_test, y_test)
+
+    print(f"---------- TRAINING GRU ----------")
+    model_gru = create_model("gru", vocab_size, gru_dim, gru_lr, gru_dropout, gru_l2_lambda)
+    early_stop_gru = tf.keras.callbacks.EarlyStopping(monitor='val_accuracy', patience=gru_patience, start_from_epoch=3)
+    gru_save = tf.keras.callbacks.ModelCheckpoint('.mdl_wtsGRU.hdf5', save_best_only=True, monitor='val_accuracy', mode='max')
+    train_history_gru = model_gru.fit(x_train, y_train, validation_data=(x_test, y_test), epochs=max_epoch, callbacks=[early_stop_gru, gru_save])
+    gru_validation_accuracy = np.max(train_history_gru.history['val_accuracy'])
+    plot_learning_history(train_history_gru, "gru", 0, gru_dropout, gru_dim, gru_lr, gru_l2_lambda, removed_outliers)
+    model_gru.load_weights(filepath = '.mdl_wtsGRU.hdf5')
+    scoreGRU = model_gru.evaluate(x_test, y_test)
+
+    print("Validation accuracy RNN: ", rnn_validation_accuracy)
+    print("Validation accuracy LSTM: ", lstm_validation_accuracy)
+    print("Validation accuracy GRU: ", gru_validation_accuracy)
+
+    print("Test accuracy RNN: ", scoreRNN[1])
+    print("Test loss RNN: ", scoreRNN[0])
+    print("Test accuracy LSTM: ", scoreLSTM[1])
+    print("Test loss LSTM: ", scoreLSTM[0])
+    print("Test accuracy GRU: ", scoreGRU[1])
+    print("Test loss GRU: ", scoreGRU[0])
+
+
 
 def main():
     _, labels = load_data_into_count_vector()
 
+
     # without removing outliers
     removed_outliers = False
     encoded_reviews = pad_features(load_encoded_data())
-    kfold_train(encoded_reviews, labels, random_state, removed_outliers)
+    train_validation_test(encoded_reviews, labels, random_state, removed_outliers)
+    #kfold_train(encoded_reviews, labels, random_state, removed_outliers)
 
     # removed outliers
     removed_outliers = True
     encoded_reviews, labels = remove_outliers(load_encoded_data(), labels)
     encoded_reviews = pad_features(encoded_reviews)
-    kfold_train(encoded_reviews, labels, random_state, removed_outliers)
+    train_validation_test(encoded_reviews, labels, random_state, removed_outliers)
+    #kfold_train(encoded_reviews, labels, random_state, removed_outliers)
 
 
 if __name__ == "__main__":
